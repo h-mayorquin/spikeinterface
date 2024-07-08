@@ -664,7 +664,7 @@ class BaseExtractor:
         # Writing paths as relative_to requires recursively expanding the dict
         if relative_to:
             relative_to = Path(file_path).parent if relative_to is True else Path(relative_to)
-            relative_to = relative_to.resolve().absolute()
+            relative_to = relative_to.resolve()
 
         dump_dict = self.to_dict(
             include_annotations=True,
@@ -940,7 +940,7 @@ class BaseExtractor:
         # dump provenance
         provenance_file = folder / f"provenance.json"
         if self.check_serializability("json"):
-            self.dump(provenance_file)
+            self.dump_to_json(provenance_file, relative_to=folder)
         else:
             provenance_file.write_text(
                 json.dumps({"warning": "the provenace is not json serializable!!!"}), encoding="utf8"
@@ -955,7 +955,7 @@ class BaseExtractor:
         self.copy_metadata(cached)
 
         # dump
-        cached.dump(folder / f"si_folder.json", relative_to=folder)
+        cached.dump_to_json(folder / f"si_folder.json", relative_to=folder)
 
         return cached
 
