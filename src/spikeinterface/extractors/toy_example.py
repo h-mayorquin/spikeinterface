@@ -103,8 +103,8 @@ def toy_example(
     channel_locations = generate_channel_locations(num_channels, num_columns, contact_spacing_um)
     probe = Probe(ndim=2)
     probe.set_contacts(positions=channel_locations, shapes="circle", shape_params={"radius": 5})
+    probe.set_contact_ids([str(i) for i in range(channel_locations.shape[0])])
     probe.create_auto_shape(probe_type="rect", margin=20.0)
-    probe.set_device_channel_indices(np.arange(num_channels, dtype="int64"))
 
     # generate templates
     # this is hard coded now but it use to be like this

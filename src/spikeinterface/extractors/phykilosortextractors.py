@@ -350,11 +350,13 @@ def read_kilosort_as_analyzer(folder_path, unwhiten=True) -> SortingAnalyzer:
         if len(probegroup.probes) > 0:
             warnings.warn("Found more than one probe. Selecting the first probe in ProbeGroup.")
         probe = probegroup.probes[0]
+        if probe.contact_ids is None:
+            probe.set_contact_ids([str(i) for i in range(probe.get_contact_count())])
     elif (phy_path / "channel_positions.npy").is_file():
         probe = Probe(si_units="um")
         channel_positions = np.load(phy_path / "channel_positions.npy")
         probe.set_contacts(channel_positions)
-        probe.set_device_channel_indices(range(probe.get_contact_count()))
+        probe.set_contact_ids([str(i) for i in range(channel_positions.shape[0])])
     else:
         AssertionError(f"Cannot read probe layout from folder {phy_path}.")
 

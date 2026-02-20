@@ -84,6 +84,9 @@ class SHYBRIDRecordingExtractor(BinaryRecordingExtractor):
 
         # load probe file
         probegroup = probeinterface.read_prb(params["probe"])
+        for probe in probegroup.probes:
+            if probe.contact_ids is None:
+                probe.set_contact_ids([str(i) for i in range(probe.get_contact_count())])
         self.set_probegroup(probegroup, in_place=True)
         self._kwargs = {"file_path": str(Path(file_path).absolute())}
         self.extra_requirements.extend(["hybridizer", "pyyaml"])

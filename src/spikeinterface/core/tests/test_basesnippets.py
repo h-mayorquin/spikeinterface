@@ -148,18 +148,20 @@ def test_BaseSnippets(create_cache_folder):
     assert np.array_equal(positions2, [[0, 30.0], [0.0, 0.0]])
 
     probe2 = snippets_p.get_probe()
-    positions3 = probe2.contact_positions
-    assert np.array_equal(positions2, positions3)
-
-    assert np.array_equal(probe2.device_channel_indices, [0, 1])
+    # get_probe() returns the full unmodified probe geometry (all 3 contacts)
+    assert probe2.get_contact_count() == 3
+    # channel_locations are the connected subset
+    assert np.array_equal(snippets_p.get_channel_locations(), [[0, 30.0], [0.0, 0.0]])
+    # mapping should point to the correct contacts
+    assert np.array_equal(snippets_p._channel_to_contact_indices, [2, 0])
 
     # test save with probe
     folder = cache_folder / "simple_snippets3"
     snippets2 = snippets_p.save(folder=folder)
     snippets2 = load(folder)
     probe2 = snippets2.get_probe()
-    assert np.array_equal(probe2.contact_positions, [[0, 30.0], [0.0, 0.0]])
-    positions2 = snippets_p.get_channel_locations()
+    assert probe2.get_contact_count() == 3
+    positions2 = snippets2.get_channel_locations()
     assert np.array_equal(positions2, [[0, 30.0], [0.0, 0.0]])
     wavefroms2 = snippets2.get_snippets(segment_index=0)
     assert np.array_equal(wavefroms2, snippets_p.get_snippets(segment_index=0))

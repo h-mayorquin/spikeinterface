@@ -28,7 +28,6 @@ def recording_and_shape():
     num_cols = 2
     num_rows = 64
     probe = probeinterface.generate_multi_columns_probe(num_columns=num_cols, num_contact_per_column=num_rows)
-    probe.set_device_channel_indices(np.arange(num_cols * num_rows))
     recording = generate_recording(num_channels=num_cols * num_rows, durations=[10.0], sampling_frequency=30000)
     recording.set_probe(probe, in_place=True)
     recording = depth_order(recording)

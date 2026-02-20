@@ -78,7 +78,6 @@ def generate_recording(
         probe = generate_linear_probe(num_elec=num_channels)
         if ndim == 3:
             probe = probe.to_3d()
-        probe.set_device_channel_indices(np.arange(num_channels))
         recording.set_probe(probe, in_place=True)
 
     recording.name = "SyntheticRecording"
@@ -2422,7 +2421,6 @@ def generate_ground_truth_recording(
             raise ValueError("num_columns should be provided in dict generate_probe_kwargs")
 
         probe = generate_multi_columns_probe(**prb_kwargs)
-        probe.set_device_channel_indices(np.arange(num_channels))
 
     else:
         num_channels = probe.get_contact_count()

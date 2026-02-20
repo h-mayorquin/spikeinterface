@@ -1032,6 +1032,14 @@ def get_rec_attributes(recording):
         properties=properties_to_attrs,
         dtype=recording.get_dtype(),
     )
+
+    # Include probe mapping in rec_attributes
+    if hasattr(recording, "_channel_to_contact_indices") and recording._channel_to_contact_indices is not None:
+        rec_attributes["channel_to_contact_indices"] = recording._channel_to_contact_indices
+        channel_to_contact_ids = recording.get_channel_to_contact_ids()
+        if channel_to_contact_ids is not None:
+            rec_attributes["channel_to_contact_ids"] = channel_to_contact_ids
+
     return rec_attributes
 
 

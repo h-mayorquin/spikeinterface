@@ -125,9 +125,10 @@ def test_compare_input_argument_ranges_against_ibl(shanks, p, sigma_um, num_chan
 
     # distribute default probe locations across 4 shanks if set
     rng = np.random.default_rng(seed=None)
-    x = rng.choice(shanks, num_channels)
-    for idx, __ in enumerate(recording._properties["contact_vector"]):
-        recording._properties["contact_vector"][idx][1] = x[idx]
+    x = rng.choice(shanks, num_channels).astype("float64")
+    probe = recording.get_probe()
+    probe.contact_positions[:, 0] = x
+    recording = recording.set_probe(probe, in_place=True)
 
     # generate random bad channel locations
     bad_channel_indexes = rng.choice(num_channels, rng.integers(1, int(num_channels / 5)), replace=False)
@@ -165,14 +166,14 @@ def test_output_values():
     bad_channel_indexes = np.array([0])
     bad_channel_ids = recording.channel_ids[bad_channel_indexes]
 
-    new_probe_locs = [
-        [5, 7, 3, 5, 5],  # 5 channels, a in the center ('bad channel', zero index)
-        [5, 5, 5, 7, 3],
-    ]  # all others equal distance away.
-    # Overwrite the probe information with the new locations
-    for idx, (x, y) in enumerate(zip(*new_probe_locs)):
-        recording._properties["contact_vector"][idx][1] = x
-        recording._properties["contact_vector"][idx][2] = y
+    new_positions = np.array(
+        [[5, 5], [7, 5], [3, 5], [5, 7], [5, 3]],  # channel 0 in center, others equal distance away
+        dtype="float64",
+    )
+    # Overwrite the probe geometry with new positions
+    probe = recording.get_probe()
+    probe.contact_positions[:] = new_positions
+    recording = recording.set_probe(probe, in_place=True)
 
     # Run interpolation in SI and check the interpolated channel
     # 0 is a linear combination of other channels
@@ -186,8 +187,9 @@ def test_output_values():
     # Shift the last channel position so that it is 4 units, rather than 2
     # away. Setting sigma_um = p = 1 allows easy calculation of the expected
     # weights.
-    recording._properties["contact_vector"][-1][1] = 5
-    recording._properties["contact_vector"][-1][2] = 9
+    probe = recording.get_probe()
+    probe.contact_positions[-1] = [5, 9]
+    recording = recording.set_probe(probe, in_place=True)
     expected_weights = np.r_[np.tile(np.exp(-2), 3), np.exp(-4)]
     expected_weights /= np.sum(expected_weights)
 

@@ -58,6 +58,8 @@ class MEArecRecordingExtractor(NeoBaseRecordingExtractor):
 
         probe = probeinterface.read_mearec(file_path)
         probe.annotations["mearec_name"] = str(probe.annotations["mearec_name"])
+        if probe.contact_ids is None:
+            probe.set_contact_ids([str(i) for i in range(probe.get_contact_count())])
         self.set_probe(probe, in_place=True)
         self.annotate(is_filtered=True)
 

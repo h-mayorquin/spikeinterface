@@ -418,7 +418,6 @@ def generate_drifting_recording(
         generate_probe_kwargs = _toy_probes[probe_name]
     probe = generate_multi_columns_probe(**generate_probe_kwargs)
     num_channels = probe.get_contact_count()
-    probe.set_device_channel_indices(np.arange(num_channels))
     channel_locations = probe.contact_positions
     # import matplotlib.pyplot as plt
     # import probeinterface.plotting

@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from probeinterface import read_probeinterface, write_probeinterface
 
 from .base import BaseSegment
 from .baserecordingsnippets import BaseRecordingSnippets
@@ -650,9 +649,16 @@ class BaseRecording(BaseRecordingSnippets):
         else:
             raise ValueError(f"format {format} not supported")
 
-        if self.get_property("contact_vector") is not None:
+        if self.has_probe():
             probegroup = self.get_probegroup()
-            cached.set_probegroup(probegroup)
+            channel_to_contact_ids = self.get_channel_to_contact_ids()
+            if channel_to_contact_ids is not None:
+                cached.set_probegroup(
+                    probegroup,
+                    channel_to_contact_ids=channel_to_contact_ids,
+                )
+            else:
+                cached.set_probegroup(probegroup)
 
         for segment_index in range(self.get_num_segments()):
             if self.has_time_vector(segment_index):
@@ -663,13 +669,11 @@ class BaseRecording(BaseRecordingSnippets):
         return cached
 
     def _extra_metadata_from_folder(self, folder):
-        # load probe
-        folder = Path(folder)
-        if (folder / "probe.json").is_file():
-            probegroup = read_probeinterface(folder / "probe.json")
-            self.set_probegroup(probegroup, in_place=True)
+        # load probe (handled in BaseRecordingSnippets)
+        super()._extra_metadata_from_folder(folder)
 
         # load time vector if any
+        folder = Path(folder)
         for segment_index, rs in enumerate(self._recording_segments):
             time_file = folder / f"times_cached_seg{segment_index}.npy"
             if time_file.is_file():
@@ -677,10 +681,8 @@ class BaseRecording(BaseRecordingSnippets):
                 rs.time_vector = time_vector
 
     def _extra_metadata_to_folder(self, folder):
-        # save probe
-        if self.get_property("contact_vector") is not None:
-            probegroup = self.get_probegroup()
-            write_probeinterface(folder / "probe.json", probegroup)
+        # save probe (handled in BaseRecordingSnippets)
+        super()._extra_metadata_to_folder(folder)
 
         # save time vector if any
         for segment_index, rs in enumerate(self._recording_segments):

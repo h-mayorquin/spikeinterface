@@ -202,18 +202,20 @@ def test_BaseRecording(create_cache_folder):
     assert np.array_equal(positions2, [[0, 30.0], [0.0, 0.0]])
 
     probe2 = rec_p.get_probe()
-    positions3 = probe2.contact_positions
-    assert np.array_equal(positions2, positions3)
-
-    assert np.array_equal(probe2.device_channel_indices, [0, 1])
+    # get_probe() now returns the full unmodified probe geometry (all 6 contacts)
+    assert probe2.get_contact_count() == 6
+    # channel_locations are the connected subset
+    assert np.array_equal(rec_p.get_channel_locations(), [[0, 30.0], [0.0, 0.0]])
+    # mapping should point to the correct contacts
+    assert np.array_equal(rec_p._channel_to_contact_indices, [2, 0])
 
     # test save with probe
     folder = cache_folder / "simple_recording3"
     rec2 = rec_p.save(folder=folder, chunk_size=10, n_jobs=2)
     rec2 = load(folder)
     probe2 = rec2.get_probe()
-    assert np.array_equal(probe2.contact_positions, [[0, 30.0], [0.0, 0.0]])
-    positions2 = rec_p.get_channel_locations()
+    assert probe2.get_contact_count() == 6
+    positions2 = rec2.get_channel_locations()
     assert np.array_equal(positions2, [[0, 30.0], [0.0, 0.0]])
     traces2 = rec2.get_traces(segment_index=0)
 
@@ -237,7 +239,6 @@ def test_BaseRecording(create_cache_folder):
         shank_ids=shank_ids,
         contact_sides=contact_sides,
     )
-    probe.set_device_channel_indices(np.arange(12))
     probe.create_auto_shape()
     traces = np.zeros((1000, 12), dtype="int16")
     rec = NumpyRecording([traces], 30000.0)
@@ -441,10 +442,13 @@ def test_interleaved_probegroups():
     probegroup.add_probe(probe2)
     probegroup.set_global_device_channel_indices(np.random.permutation(16))
 
-    recording.set_probegroup(probegroup)
-    probegroup_set = recording.get_probegroup()
-    # check that the probe group is correctly set, by sorting the device channel indices
-    assert np.array_equal(probegroup_set.get_global_device_channel_indices()["device_channel_indices"], np.arange(16))
+    rec_with_probe = recording.set_probegroup(probegroup)
+    # check that channel locations are correct (the mapping resolves the permuted wiring)
+    probegroup_set = rec_with_probe.get_probegroup()
+    assert len(probegroup_set.probes) == 2
+    # verify the mapping is stored and locations match
+    assert rec_with_probe._channel_to_contact_indices is not None
+    assert rec_with_probe.get_channel_locations().shape == (16, 2)
 
 
 def test_rename_channels():

@@ -525,6 +525,17 @@ class SortingAnalyzer:
             probegroup_file = folder / "recording_info" / "probegroup.json"
             probeinterface.write_probeinterface(probegroup_file, probegroup)
 
+        # Save channel_to_contact_ids if available
+        import json as json_module
+
+        ch_to_ids = rec_attributes.get("channel_to_contact_ids") if rec_attributes is not None else None
+        if ch_to_ids is None and recording is not None:
+            ch_to_ids = recording.get_channel_to_contact_ids()
+        if ch_to_ids is not None:
+            serializable = {str(k): str(v) for k, v in ch_to_ids.items()}
+            with open(folder / "recording_info" / "channel_to_contact_ids.json", "w") as f:
+                json_module.dump(serializable, f)
+
         if sparsity is not None:
             np.save(folder / "sparsity_mask.npy", sparsity.mask)
 
@@ -578,6 +589,20 @@ class SortingAnalyzer:
             rec_attributes["probegroup"] = probeinterface.read_probeinterface(probegroup_file)
         else:
             rec_attributes["probegroup"] = None
+
+        # Load channel_to_contact_ids if available
+        import json as json_module
+
+        ids_file = folder / "recording_info" / "channel_to_contact_ids.json"
+        if ids_file.is_file():
+            with open(ids_file) as f:
+                rec_attributes["channel_to_contact_ids"] = json_module.load(f)
+        else:
+            # Backward compat: old format saved indices as npy
+            mapping_file = folder / "recording_info" / "channel_to_contact_indices.npy"
+            if mapping_file.is_file():
+                mapping = np.load(mapping_file)
+                rec_attributes["channel_to_contact_indices"] = mapping
 
         # sparsity
         sparsity_file = folder / "sparsity_mask.npy"
@@ -697,6 +722,13 @@ class SortingAnalyzer:
         if probegroup is not None:
             recording_info.attrs["probegroup"] = check_json(probegroup.to_dict())
 
+        # Save channel_to_contact_ids if available
+        ch_to_ids = rec_attributes.get("channel_to_contact_ids")
+        if ch_to_ids is None and recording is not None:
+            ch_to_ids = recording.get_channel_to_contact_ids()
+        if ch_to_ids is not None:
+            recording_info.attrs["channel_to_contact_ids"] = {str(k): str(v) for k, v in ch_to_ids.items()}
+
         if sparsity is not None:
             zarr_root.create_dataset("sparsity_mask", data=sparsity.mask, **saving_options)
 
@@ -760,6 +792,15 @@ class SortingAnalyzer:
             rec_attributes["probegroup"] = probeinterface.ProbeGroup.from_dict(probegroup_dict)
         else:
             rec_attributes["probegroup"] = None
+
+        # Load channel_to_contact_ids if available
+        if "channel_to_contact_ids" in zarr_root["recording_info"].attrs:
+            rec_attributes["channel_to_contact_ids"] = zarr_root["recording_info"].attrs["channel_to_contact_ids"]
+        elif "channel_to_contact_indices" in zarr_root["recording_info"].attrs:
+            # Backward compat
+            rec_attributes["channel_to_contact_indices"] = np.array(
+                zarr_root["recording_info"].attrs["channel_to_contact_indices"], dtype="int64"
+            )
 
         # sparsity
         if "sparsity_mask" in zarr_root:
@@ -1575,12 +1616,33 @@ class SortingAnalyzer:
         # important note : contrary to recording
         # this give all channel locations, so no kwargs like channel_ids and axes
         probegroup = self.get_probegroup()
+
+        # Try channel_to_contact_ids first (new format)
+        channel_to_contact_ids = self.rec_attributes.get("channel_to_contact_ids")
+        if channel_to_contact_ids is not None:
+            from .baserecordingsnippets import BaseRecordingSnippets
+
+            BaseRecordingSnippets._ensure_probes_have_contact_ids(probegroup)
+            all_contact_ids = np.concatenate([p.contact_ids for p in probegroup.probes])
+            all_positions = np.concatenate([p.contact_positions for p in probegroup.probes])
+            contact_id_to_index = {str(cid): i for i, cid in enumerate(all_contact_ids)}
+            # Normalize dict keys to strings (handles both native and JSON-deserialized dicts)
+            ch_to_ids_str = {str(k): str(v) for k, v in channel_to_contact_ids.items()}
+            channel_ids = self.rec_attributes["channel_ids"]
+            mapping = np.array([contact_id_to_index[ch_to_ids_str[str(ch)]] for ch in channel_ids], dtype="int64")
+            return np.asarray(all_positions[mapping], dtype="float64")
+
+        # Try channel_to_contact_indices (backward compat)
+        mapping = self.rec_attributes.get("channel_to_contact_indices")
+        if mapping is not None:
+            all_positions = np.concatenate([p.contact_positions for p in probegroup.probes])
+            return np.asarray(all_positions[mapping], dtype="float64")
+
+        # legacy fallback: sort by device_channel_indices
         probe_as_numpy_array = probegroup.to_numpy(complete=True)
-        # we need to sort by device_channel_indices to ensure the order of locations is correct
         probe_as_numpy_array = probe_as_numpy_array[np.argsort(probe_as_numpy_array["device_channel_indices"])]
         ndim = probegroup.ndim
         locations = np.zeros((probe_as_numpy_array.size, ndim), dtype="float64")
-        # here we only loop through xy because only 2d locations are supported
         for i, dim in enumerate(["x", "y"][:ndim]):
             locations[:, i] = probe_as_numpy_array[dim]
         return locations

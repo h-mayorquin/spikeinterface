@@ -9,6 +9,7 @@ from probeinterface import ProbeGroup
 
 from .base import minimum_spike_dtype
 from .baserecording import BaseRecording, BaseRecordingSegment
+from .baserecordingsnippets import BaseRecordingSnippets
 from .basesorting import BaseSorting, SpikeVectorSortingSegment
 from .core_tools import define_function_from_class, check_json
 from .job_tools import split_job_kwargs
@@ -182,7 +183,24 @@ class ZarrRecordingExtractor(BaseRecording):
         probe_dict = self._root.attrs.get("probe", None)
         if probe_dict is not None:
             probegroup = ProbeGroup.from_dict(probe_dict)
-            self.set_probegroup(probegroup, in_place=True)
+            # Check for new-style id-based mapping
+            channel_to_contact_ids = self._root.attrs.get("channel_to_contact_ids", None)
+            if channel_to_contact_ids is not None:
+                self.set_probegroup(
+                    probegroup,
+                    in_place=True,
+                    channel_to_contact_ids=channel_to_contact_ids,
+                )
+            elif self._root.attrs.get("channel_to_contact_indices", None) is not None:
+                # Backward compat: old format saved indices
+                mapping = np.array(self._root.attrs["channel_to_contact_indices"], dtype="int64")
+                BaseRecordingSnippets._ensure_probes_have_contact_ids(probegroup)
+                all_contact_ids = np.concatenate([p.contact_ids for p in probegroup.probes])
+                mapped_ids = all_contact_ids[mapping]
+                ch_to_ids = dict(zip([str(ch) for ch in self.channel_ids], mapped_ids.tolist()))
+                self.set_probegroup(probegroup, in_place=True, channel_to_contact_ids=ch_to_ids)
+            else:
+                self.set_probegroup(probegroup, in_place=True)
 
         # load properties
         if "properties" in self._root:
@@ -496,9 +514,13 @@ def add_recording_to_zarr_group(
     )
 
     # save probe
-    if recording.get_property("contact_vector") is not None:
+    if recording.has_probe():
         probegroup = recording.get_probegroup()
         zarr_group.attrs["probe"] = check_json(probegroup.to_dict(array_as_list=True))
+        # Save channel_to_contact_ids
+        channel_to_contact_ids = recording.get_channel_to_contact_ids()
+        if channel_to_contact_ids is not None:
+            zarr_group.attrs["channel_to_contact_ids"] = {str(k): str(v) for k, v in channel_to_contact_ids.items()}
 
     # save time vector if any
     t_starts = np.zeros(recording.get_num_segments(), dtype="float64") * np.nan

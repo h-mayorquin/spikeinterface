@@ -79,7 +79,6 @@ def test_detect_bad_channels_std_mad():
     rec = NumpyRecording(traces_list, sampling_frequency)
 
     probe = generate_linear_probe(num_elec=num_channels)
-    probe.set_device_channel_indices(np.arange(num_channels))
     rec.set_probe(probe, in_place=True)
 
     bad_channels_std, bad_labels_std = detect_bad_channels(rec, method="std")
@@ -124,7 +123,6 @@ def test_detect_bad_channels_extremes(outside_channels_location):
     rec.set_channel_offsets(0)
 
     probe = generate_linear_probe(num_elec=num_channels)
-    probe.set_device_channel_indices(np.arange(num_channels))
     rec.set_probe(probe, in_place=True)
 
     bad_channel_ids, bad_labels = detect_bad_channels(

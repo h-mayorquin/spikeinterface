@@ -72,6 +72,8 @@ class BiocamRecordingExtractor(NeoBaseRecordingExtractor):
         if electrode_width is not None:
             probe_kwargs["electrode_width"] = electrode_width
         probe = probeinterface.read_3brain(file_path, **probe_kwargs)
+        if probe.contact_ids is None:
+            probe.set_contact_ids([str(i) for i in range(probe.get_contact_count())])
         self.set_probe(probe, in_place=True)
         self.set_property("row", self.get_property("contact_vector")["row"])
         self.set_property("col", self.get_property("contact_vector")["col"])

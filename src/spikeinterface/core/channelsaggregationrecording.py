@@ -3,6 +3,8 @@ import warnings
 
 import numpy as np
 
+from probeinterface import ProbeGroup
+
 from .baserecording import BaseRecording, BaseRecordingSegment
 
 
@@ -92,9 +94,39 @@ class ChannelsAggregationRecording(BaseRecording):
 
         for prop_name, prop_values in property_dict.items():
             if prop_name == "contact_vector":
-                # remap device channel indices correctly
-                prop_values["device_channel_indices"] = np.arange(self.get_num_channels())
+                # contact_vector is now computed from _probe_group + mapping; skip storing it
+                continue
             self.set_property(key=prop_name, values=prop_values)
+
+        # Combine probe data from all recordings.
+        # Track already-seen ProbeGroups by identity to avoid duplicating
+        # the same probe geometry (e.g., after split_by then aggregate).
+        combined_probe_group = ProbeGroup()
+        contact_offset = 0
+        all_mappings = []
+        has_probes = False
+        seen_probe_group_ids = set()
+        for rec in recording_list:
+            if rec._probe_group is not None:
+                has_probes = True
+                pg_id = id(rec._probe_group)
+                if pg_id not in seen_probe_group_ids:
+                    seen_probe_group_ids.add(pg_id)
+                    for probe in rec._probe_group.probes:
+                        probe_copy = probe.copy()
+                        # probe.copy() does not preserve contact_ids (probeinterface limitation)
+                        if probe.contact_ids is not None and probe_copy.contact_ids is None:
+                            probe_copy.set_contact_ids(probe.contact_ids)
+                        combined_probe_group.add_probe(probe_copy)
+                    # Only advance offset for newly added probe groups
+                    all_mappings.append(rec._channel_to_contact_indices + contact_offset)
+                    contact_offset += sum(p.get_contact_count() for p in rec._probe_group.probes)
+                else:
+                    # Same probe group already added; mappings reference existing contacts
+                    all_mappings.append(rec._channel_to_contact_indices)
+        if has_probes:
+            self._probe_group = combined_probe_group
+            self._channel_to_contact_indices = np.concatenate(all_mappings)
 
         # if locations are present, check that they are all different!
         if "location" in self.get_property_keys():

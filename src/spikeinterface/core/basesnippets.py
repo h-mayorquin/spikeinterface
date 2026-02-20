@@ -264,9 +264,16 @@ class BaseSnippets(BaseRecordingSnippets):
         else:
             raise ValueError(f"format {format} not supported")
 
-        if self.get_property("contact_vector") is not None:
+        if self.has_probe():
             probegroup = self.get_probegroup()
-            cached.set_probegroup(probegroup)
+            channel_to_contact_ids = self.get_channel_to_contact_ids()
+            if channel_to_contact_ids is not None:
+                cached.set_probegroup(
+                    probegroup,
+                    channel_to_contact_ids=channel_to_contact_ids,
+                )
+            else:
+                cached.set_probegroup(probegroup)
 
         return cached
 

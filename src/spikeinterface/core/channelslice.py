@@ -64,11 +64,12 @@ class ChannelSliceRecording(BaseRecording):
         parent_recording.copy_metadata(self, only_main=False, ids=self._channel_ids)
         self._parent = parent_recording
 
-        # change the wiring of the probe
-        contact_vector = self.get_property("contact_vector")
-        if contact_vector is not None:
-            contact_vector["device_channel_indices"] = np.arange(len(channel_ids), dtype="int64")
-            self.set_property("contact_vector", contact_vector)
+        # propagate probe mapping
+        if parent_recording._probe_group is not None:
+            self._probe_group = parent_recording._probe_group
+            self._channel_to_contact_indices = parent_recording._channel_to_contact_indices[
+                self._parent_channel_indices
+            ]
 
         # update dump dict
         self._kwargs = {
@@ -154,11 +155,10 @@ class ChannelSliceSnippets(BaseSnippets):
         # copy annotation and properties
         parent_snippets.copy_metadata(self, only_main=False, ids=self._channel_ids)
 
-        # change the wiring of the probe
-        contact_vector = self.get_property("contact_vector")
-        if contact_vector is not None:
-            contact_vector["device_channel_indices"] = np.arange(len(channel_ids), dtype="int64")
-            self.set_property("contact_vector", contact_vector)
+        # propagate probe mapping
+        if parent_snippets._probe_group is not None:
+            self._probe_group = parent_snippets._probe_group
+            self._channel_to_contact_indices = parent_snippets._channel_to_contact_indices[self._parent_channel_indices]
 
         # update dump dict
         self._kwargs = {

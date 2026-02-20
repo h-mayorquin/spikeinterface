@@ -76,6 +76,8 @@ class MaxwellRecordingExtractor(NeoBaseRecordingExtractor):
         # rec_name auto set by neo
         rec_name = self.neo_reader.rec_name
         probe = probeinterface.read_maxwell(file_path, well_name=well_name, rec_name=rec_name)
+        if probe.contact_ids is None:
+            probe.set_contact_ids([str(i) for i in range(probe.get_contact_count())])
         self.set_probe(probe, in_place=True)
         self.set_property("electrode", self.get_property("contact_vector")["electrode"])
         self._kwargs.update(dict(file_path=str(Path(file_path).absolute()), rec_name=rec_name))

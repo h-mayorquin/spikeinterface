@@ -24,7 +24,6 @@ def make_some_templates():
         contact_shapes="square",
         contact_shape_params={"width": 10},
     )
-    probe.set_device_channel_indices(np.arange(probe.contact_ids.size))
 
     # import matplotlib.pyplot as plt
     # from probeinterface.plotting import plot_probe
