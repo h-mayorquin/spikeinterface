@@ -411,6 +411,12 @@ class InterpolateMotionRecording(BasePreprocessor):
                 self._probe_group = recording._probe_group
                 parent_channel_indices = recording.ids_to_indices(channel_ids)
                 self._channel_to_contact_indices = recording._channel_to_contact_indices[parent_channel_indices]
+                if recording._channel_to_contact_ids is not None:
+                    self._channel_to_contact_ids = {
+                        channel_id: recording._channel_to_contact_ids[channel_id]
+                        for channel_id in channel_ids
+                        if channel_id in recording._channel_to_contact_ids
+                    }
 
         # handle manual interpolation_time_bin_centers_s
         # the case where interpolation_time_bin_size_s is set is handled per-segment below

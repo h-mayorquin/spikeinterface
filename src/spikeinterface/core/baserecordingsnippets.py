@@ -22,6 +22,7 @@ class BaseRecordingSnippets(BaseExtractor):
         self._dtype = np.dtype(dtype)
         self._probe_group = None
         self._channel_to_contact_indices = None
+        self._channel_to_contact_ids = None
 
     @property
     def channel_ids(self):
@@ -105,25 +106,25 @@ class BaseRecordingSnippets(BaseExtractor):
 
     def set_probe(self, probe, group_mode="auto", in_place=False, channel_to_contact_ids=None):
         """
-        Attach a Probe object to a recording.
+        Attach a list of Probe object to a recording.
 
         Parameters
         ----------
-        probe : Probe
-            The probe to be attached to the recording
-        group_mode : "auto" | "by_probe" | "by_shank" | "by_side", default: "auto"
+        probe_or_probegroup: Probe, list of Probe, or ProbeGroup
+            The probe(s) to be attached to the recording
+        group_mode: "auto" | "by_probe" | "by_shank" | "by_side", default: "auto"
             How to add the "group" property.
-            "auto" is the best splitting possible that can be all at once when
-            multiple probes, multiple shanks and two sides are present.
-        in_place : bool, default: False
-            Useful internally when extractor do self.set_probe(probe)
+            "auto" is the best splitting possible that can be all at once when multiple probes, multiple shanks and two sides are present.
+        in_place: bool
+            False by default.
+            Useful internally when extractor do self.set_probegroup(probe)
         channel_to_contact_ids : dict or None, default: None
             Optional mapping from channel_id to contact_id. If None, identity
             mapping is assumed (channel i reads from contact i).
 
         Returns
         -------
-        sub_recording : BaseRecording
+        sub_recording: BaseRecording
             A view of the recording (ChannelSlice or clone or itself)
         """
         assert isinstance(probe, Probe), "must give Probe"
@@ -158,14 +159,7 @@ class BaseRecordingSnippets(BaseExtractor):
         channel_to_contact_ids : dict
             Mapping from channel_id to contact_id, or None if no probe is set.
         """
-        if self._probe_group is None or self._channel_to_contact_indices is None:
-            return None
-        # Check all probes have contact_ids
-        if any(p.contact_ids is None for p in self._probe_group.probes):
-            return None
-        all_contact_ids = np.concatenate([p.contact_ids for p in self._probe_group.probes])
-        mapped_contact_ids = all_contact_ids[self._channel_to_contact_indices]
-        return dict(zip(self.channel_ids, mapped_contact_ids))
+        return self._channel_to_contact_ids
 
     def _build_channel_to_contact_indices_from_ids(self, probegroup, channel_to_contact_ids):
         """Convert the user-provided id-based mapping to the internal index-based mapping.
@@ -314,23 +308,32 @@ class BaseRecordingSnippets(BaseExtractor):
         channel_to_contact_ids=None,
     ):
         """
-        Attach probes to a recording.
+        Attach a list of Probe objects to a recording.
+        For this Probe.device_channel_indices is used to link contacts to recording channels.
+        If some contacts of the Probe are not connected (device_channel_indices=-1)
+        then the recording is "sliced" and only connected channel are kept.
+
+        The probe order is not kept. Channel ids are re-ordered to match the channel_ids of the recording.
+
 
         Parameters
         ----------
-        probe_or_probe_group : Probe, list of Probe, or ProbeGroup
-            The probe(s) to be attached to the recording.
-        group_mode : "auto" | "by_probe" | "by_shank" | "by_side", default: "auto"
+        probe_or_probegroup: Probe, list of Probe, or ProbeGroup
+            The probe(s) to be attached to the recording
+        group_mode: "auto" | "by_probe" | "by_shank" | "by_side", default: "auto"
             How to add the "group" property.
-        in_place : bool, default: False
-            If True, set the probe on self directly.
+            "auto" is the best splitting possible that can be all at once when multiple probes, multiple shanks and two sides are present.
+        in_place: bool
+            False by default.
+            Useful internally when extractor do self.set_probegroup(probe)
         channel_to_contact_ids : dict or None, default: None
-            Optional mapping from channel_id to contact_id.
+            Optional mapping from channel_id to contact_id. If None, the mapping
+            is inferred from device_channel_indices (legacy) or identity.
 
         Returns
         -------
-        sub_recording : BaseRecording
-            A view of the recording.
+        sub_recording: BaseRecording
+            A view of the recording (ChannelSlice or clone or itself)
         """
         assert group_mode in (
             "auto",
@@ -413,9 +416,17 @@ class BaseRecordingSnippets(BaseExtractor):
             else:
                 sub_recording = self.clone()
 
+        # Build channel_to_contact_ids dict if not provided by the user
+        if channel_to_contact_ids is None:
+            all_contact_ids = np.concatenate([p.contact_ids for p in probegroup.probes])
+            mapped_contact_ids = all_contact_ids[channel_to_contact_indices]
+            channel_ids_for_map = new_channel_ids if new_channel_ids is not None else self.get_channel_ids()
+            channel_to_contact_ids = dict(zip(channel_ids_for_map, mapped_contact_ids))
+
         # Store the probe and channel-to-contact mapping
         sub_recording._probe_group = probegroup
         sub_recording._channel_to_contact_indices = channel_to_contact_indices
+        sub_recording._channel_to_contact_ids = channel_to_contact_ids
 
         # planar_contour is saved in annotations
         for probe_index, probe in enumerate(probegroup.probes):
@@ -736,6 +747,9 @@ class BaseRecordingSnippets(BaseExtractor):
         if self._probe_group is not None:
             cloned._probe_group = self._probe_group
             cloned._channel_to_contact_indices = self._channel_to_contact_indices.copy()
+            cloned._channel_to_contact_ids = (
+                self._channel_to_contact_ids.copy() if self._channel_to_contact_ids is not None else None
+            )
         return cloned
 
     def select_channels(self, channel_ids):

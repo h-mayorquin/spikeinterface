@@ -127,6 +127,12 @@ class ChannelsAggregationRecording(BaseRecording):
         if has_probes:
             self._probe_group = combined_probe_group
             self._channel_to_contact_indices = np.concatenate(all_mappings)
+            # Combine channel_to_contact_ids dicts
+            combined_ids = {}
+            for rec in recording_list:
+                if rec._channel_to_contact_ids is not None:
+                    combined_ids.update(rec._channel_to_contact_ids)
+            self._channel_to_contact_ids = combined_ids if combined_ids else None
 
         # if locations are present, check that they are all different!
         if "location" in self.get_property_keys():

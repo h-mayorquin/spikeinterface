@@ -70,6 +70,13 @@ class ChannelSliceRecording(BaseRecording):
             self._channel_to_contact_indices = parent_recording._channel_to_contact_indices[
                 self._parent_channel_indices
             ]
+            if parent_recording._channel_to_contact_ids is not None:
+                # Map from original channel_ids to contact_ids, using renamed ids as new keys
+                self._channel_to_contact_ids = {
+                    new_id: parent_recording._channel_to_contact_ids[orig_id]
+                    for orig_id, new_id in zip(self._channel_ids, self._renamed_channel_ids)
+                    if orig_id in parent_recording._channel_to_contact_ids
+                }
 
         # update dump dict
         self._kwargs = {
@@ -159,6 +166,12 @@ class ChannelSliceSnippets(BaseSnippets):
         if parent_snippets._probe_group is not None:
             self._probe_group = parent_snippets._probe_group
             self._channel_to_contact_indices = parent_snippets._channel_to_contact_indices[self._parent_channel_indices]
+            if parent_snippets._channel_to_contact_ids is not None:
+                self._channel_to_contact_ids = {
+                    new_id: parent_snippets._channel_to_contact_ids[orig_id]
+                    for orig_id, new_id in zip(self._channel_ids, self._renamed_channel_ids)
+                    if orig_id in parent_snippets._channel_to_contact_ids
+                }
 
         # update dump dict
         self._kwargs = {
