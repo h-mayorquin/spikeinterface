@@ -647,21 +647,12 @@ class BaseRecordingSnippets(BaseExtractor):
             positions = channel_positions[np.ix_(channel_indices, col_indices)]
             return np.asarray(positions, dtype="float64")
 
-        # Fallback: contact_vector or location property
-        contact_vector = super().get_property("contact_vector")
-        if contact_vector is not None:
-            ndim = len(axes)
-            all_positions = np.zeros((contact_vector.size, ndim), dtype="float64")
-            for i, dim in enumerate(axes):
-                all_positions[:, i] = contact_vector[dim]
-            positions = all_positions[channel_indices]
-            return positions
-        else:
-            locations = self.get_property("location")
-            if locations is None:
-                raise Exception("There are no channel locations")
-            locations = np.asarray(locations)[channel_indices]
-            return select_axes(locations, axes)
+        # Fallback: location property (no probe set, locations added manually)
+        locations = self.get_property("location")
+        if locations is None:
+            raise Exception("There are no channel locations")
+        locations = np.asarray(locations)[channel_indices]
+        return select_axes(locations, axes)
 
     def has_3d_locations(self) -> bool:
         return self.get_property("location").shape[1] == 3
