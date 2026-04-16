@@ -473,6 +473,7 @@ class TestSortingTimeNoRecording:
         assert np.allclose(spike_times_after, spike_times_before + 5.0)
 
     def test_shift_times_all_segments(self):
+        # TODO: use t_starts parameter once #4523 is merged
         sorting = generate_sorting(num_units=5, durations=[10, 15])
         sorting.segments[0]._t_start = 1.0
         sorting.segments[1]._t_start = 2.0
@@ -483,6 +484,7 @@ class TestSortingTimeNoRecording:
         assert sorting.get_start_time(segment_index=1) == 5.0
 
     def test_shift_times_single_segment(self):
+        # TODO: use t_starts parameter once #4523 is merged
         sorting = generate_sorting(num_units=5, durations=[10, 15])
         sorting.segments[0]._t_start = 1.0
         sorting.segments[1]._t_start = 2.0
