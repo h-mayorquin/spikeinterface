@@ -529,6 +529,22 @@ class TestSortingTimeWithRecording:
         spike_times_after = sorting.get_unit_spike_train(unit_id, segment_index=0, return_times=True)
         assert np.allclose(spike_times_after, spike_times_before + 5.0)
 
+    def test_time_conversion_roundtrip_after_shift(self):
+        """sample_index_to_time and time_to_sample_index must account for the shift."""
+        recording = generate_recording(num_channels=4, durations=[10])
+        sorting = generate_sorting(num_units=5, durations=[10])
+        sorting.register_recording(recording)
+
+        sorting.shift_times(shift=5.0)
+
+        # Frame 30000 is 1.0s in the recording. After a 5.0s shift, the sorting should report 6.0s.
+        time = sorting.sample_index_to_time(30000, segment_index=0)
+        assert time == recording.sample_index_to_time(30000, segment_index=0) + 5.0
+
+        # The inverse: 6.0s in the sorting should map back to frame 30000.
+        frame = sorting.time_to_sample_index(time, segment_index=0)
+        assert frame == 30000
+
     def test_shift_times_with_time_vector(self):
         """Shift on sorting composes with a recording that has an explicit time vector."""
         recording = generate_recording(num_channels=4, durations=[1.0])
