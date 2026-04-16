@@ -472,6 +472,20 @@ class TestSortingTimeNoRecording:
         spike_times_after = sorting.get_unit_spike_train(unit_id, segment_index=0, return_times=True)
         assert np.allclose(spike_times_after, spike_times_before + 5.0)
 
+    def test_shift_times_with_native_spike_times(self):
+        """Shift must apply even when the segment provides native spike times (e.g. NWB extractors)."""
+        sorting = generate_sorting(num_units=5, durations=[10])
+        unit_id = sorting.unit_ids[0]
+        segment = sorting.segments[0]
+
+        # Simulate a segment that provides native spike times directly
+        original_times = sorting.get_unit_spike_train(unit_id, segment_index=0, return_times=True).copy()
+        segment.get_unit_spike_train_in_seconds = lambda unit_id, start_time, end_time: original_times
+
+        sorting.shift_times(shift=5.0)
+        spike_times = sorting.get_unit_spike_train(unit_id, segment_index=0, return_times=True)
+        assert np.allclose(spike_times, original_times + 5.0)
+
     def test_shift_times_all_segments(self):
         # TODO: use t_starts parameter once #4523 is merged
         sorting = generate_sorting(num_units=5, durations=[10, 15])

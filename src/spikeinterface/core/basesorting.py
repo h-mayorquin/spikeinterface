@@ -275,7 +275,13 @@ class BaseSorting(BaseExtractor):
         # Some instances might implement a method themselves to access spike times directly without having to convert
         # (e.g. NWB extractors)
         if hasattr(segment, "get_unit_spike_train_in_seconds"):
-            return segment.get_unit_spike_train_in_seconds(unit_id=unit_id, start_time=start_time, end_time=end_time)
+            spike_times = segment.get_unit_spike_train_in_seconds(
+                unit_id=unit_id, start_time=start_time, end_time=end_time
+            )
+            t_start = segment._t_start if segment._t_start is not None else 0
+            if t_start != 0:
+                spike_times = spike_times + t_start
+            return spike_times
 
         # If no recording attached and all back to frame-based conversion
         # Get spike train in frames and convert to times using traditional method
@@ -322,6 +328,11 @@ class BaseSorting(BaseExtractor):
                     "Might be necessary for further postprocessing."
                 )
         self._recording = recording
+        # The recording is now the source of truth for timestamps.
+        # Reset the sorting's own time offset so it doesn't double-count
+        # any t_start that was set by the extractor at init.
+        for segment in self.segments:
+            segment._t_start = 0
 
     @property
     def sorting_info(self):
