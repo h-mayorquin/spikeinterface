@@ -445,3 +445,105 @@ def test_shift_times_with_None_as_t_start():
     assert recording.segments[0].t_start is None
     recording.shift_times(shift=1.0)  # Shift by one seconds should not generate an error
     assert recording.get_start_time() == 1.0
+
+
+class TestSortingTimeNoRecording:
+    """
+    Tests for time methods on BaseSorting without a registered recording.
+    """
+
+    def test_get_start_time(self):
+        sorting = generate_sorting(num_units=5, durations=[10])
+        assert sorting.get_start_time(segment_index=0) == 0.0
+
+    def test_get_end_time(self):
+        sorting = generate_sorting(num_units=5, durations=[10])
+        assert sorting.get_end_time(segment_index=0) is None
+
+    def test_shift_times(self):
+        sorting = generate_sorting(num_units=5, durations=[10])
+        unit_id = sorting.unit_ids[0]
+
+        spike_times_before = sorting.get_unit_spike_train(unit_id, segment_index=0, return_times=True)
+
+        sorting.shift_times(shift=5.0)
+
+        assert sorting.get_start_time(segment_index=0) == 5.0
+        spike_times_after = sorting.get_unit_spike_train(unit_id, segment_index=0, return_times=True)
+        assert np.allclose(spike_times_after, spike_times_before + 5.0)
+
+    def test_shift_times_all_segments(self):
+        sorting = generate_sorting(num_units=5, durations=[10, 15])
+        sorting.segments[0]._t_start = 1.0
+        sorting.segments[1]._t_start = 2.0
+
+        sorting.shift_times(shift=3.0)
+
+        assert sorting.get_start_time(segment_index=0) == 4.0
+        assert sorting.get_start_time(segment_index=1) == 5.0
+
+    def test_shift_times_single_segment(self):
+        sorting = generate_sorting(num_units=5, durations=[10, 15])
+        sorting.segments[0]._t_start = 1.0
+        sorting.segments[1]._t_start = 2.0
+
+        sorting.shift_times(shift=3.0, segment_index=1)
+
+        assert sorting.get_start_time(segment_index=0) == 1.0
+        assert sorting.get_start_time(segment_index=1) == 5.0
+
+
+class TestSortingTimeWithRecording:
+    """
+    Tests for time methods on BaseSorting with a registered recording.
+    The key invariant: shift_times on the sorting never mutates the recording.
+    """
+
+    def test_get_start_end_time(self):
+        recording = generate_recording(num_channels=4, durations=[10])
+        sorting = generate_sorting(num_units=5, durations=[10])
+        sorting.register_recording(recording)
+
+        assert sorting.get_start_time(segment_index=0) == recording.get_start_time(segment_index=0)
+        assert sorting.get_end_time(segment_index=0) == recording.get_end_time(segment_index=0)
+
+    def test_shift_times(self):
+        recording = generate_recording(num_channels=4, durations=[10])
+        sorting = generate_sorting(num_units=5, durations=[10])
+        sorting.register_recording(recording)
+        unit_id = sorting.unit_ids[0]
+
+        rec_start_before = recording.get_start_time(segment_index=0)
+        spike_times_before = sorting.get_unit_spike_train(unit_id, segment_index=0, return_times=True)
+
+        sorting.shift_times(shift=5.0)
+
+        # The recording should be untouched
+        assert recording.get_start_time(segment_index=0) == rec_start_before
+
+        # The sorting's times should be shifted
+        assert sorting.get_start_time(segment_index=0) == rec_start_before + 5.0
+        assert sorting.get_end_time(segment_index=0) == recording.get_end_time(segment_index=0) + 5.0
+        spike_times_after = sorting.get_unit_spike_train(unit_id, segment_index=0, return_times=True)
+        assert np.allclose(spike_times_after, spike_times_before + 5.0)
+
+    def test_shift_times_with_time_vector(self):
+        """Shift on sorting composes with a recording that has an explicit time vector."""
+        recording = generate_recording(num_channels=4, durations=[1.0])
+        num_samples = recording.get_num_samples(segment_index=0)
+        times = 100.0 + np.arange(num_samples) / recording.get_sampling_frequency()
+        recording.set_times(times, segment_index=0, with_warning=False)
+
+        sorting = generate_sorting(num_units=5, durations=[1.0])
+        sorting.register_recording(recording)
+        unit_id = sorting.unit_ids[0]
+
+        spike_times_before = sorting.get_unit_spike_train(unit_id, segment_index=0, return_times=True)
+
+        sorting.shift_times(shift=5.0)
+
+        spike_times_after = sorting.get_unit_spike_train(unit_id, segment_index=0, return_times=True)
+        assert np.allclose(spike_times_after, spike_times_before + 5.0)
+
+        # Recording is untouched
+        assert np.allclose(recording.get_times(segment_index=0), times)

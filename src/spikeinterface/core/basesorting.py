@@ -359,9 +359,82 @@ class BaseSorting(BaseExtractor):
         """
         segment_index = self._check_segment_index(segment_index)
         if self.has_recording():
-            return self._recording.get_times(segment_index=segment_index)
+            times = self._recording.get_times(segment_index=segment_index)
+            t_start = self.segments[segment_index]._t_start
+            if t_start is not None and t_start != 0:
+                times = times + t_start
+            return times
         else:
             return None
+
+    def get_start_time(self, segment_index: int | None = None) -> float:
+        """Get the start time of the sorting segment.
+
+        Parameters
+        ----------
+        segment_index : int or None, default: None
+            The segment index (required for multi-segment)
+
+        Returns
+        -------
+        float
+            The start time in seconds
+        """
+        segment_index = self._check_segment_index(segment_index)
+        segment = self.segments[segment_index]
+        # Only on call we change None for 0. We use None internally to mean not set
+        t_start = segment._t_start if segment._t_start is not None else 0.0
+        if self.has_recording():
+            return self._recording.get_start_time(segment_index=segment_index) + t_start
+        else:
+            return t_start
+
+    def get_end_time(self, segment_index: int | None = None) -> float | None:
+        """Get the end time of the sorting segment.
+
+        Parameters
+        ----------
+        segment_index : int or None, default: None
+            The segment index (required for multi-segment)
+
+        Returns
+        -------
+        float or None
+            The end time in seconds, or None if no recording is registered.
+        """
+        segment_index = self._check_segment_index(segment_index)
+        if self.has_recording():
+            segment = self.segments[segment_index]
+            t_start = segment._t_start if segment._t_start is not None else 0.0
+            return self._recording.get_end_time(segment_index=segment_index) + t_start
+        else:
+            return None
+
+    def shift_times(self, shift: int | float, segment_index: int | None = None) -> None:
+        """
+        Shift all times by a scalar value.
+
+        This modifies the sorting's own time offset without touching the registered
+        recording. When resolving timestamps, the shift is applied on top of the
+        recording's time basis.
+
+        Parameters
+        ----------
+        shift : int | float
+            The shift to apply. If positive, times will be increased by `shift`.
+            If negative, times will be decreased.
+        segment_index : int | None
+            The segment on which to shift the times.
+            If `None`, all segments will be shifted.
+        """
+        if segment_index is None:
+            segments_to_shift = range(self.get_num_segments())
+        else:
+            segments_to_shift = (segment_index,)
+
+        for segment_index in segments_to_shift:
+            segment = self.segments[segment_index]
+            segment._t_start = (segment._t_start if segment._t_start is not None else 0) + shift
 
     def _save(self, format="numpy_folder", **save_kwargs):
         """
@@ -701,11 +774,11 @@ class BaseSorting(BaseExtractor):
         """
         Transform time in seconds into sample index
         """
+        segment = self.segments[segment_index]
+        t_start = segment._t_start if segment._t_start is not None else 0
         if self.has_recording():
-            sample_index = self._recording.time_to_sample_index(time, segment_index=segment_index)
+            sample_index = self._recording.time_to_sample_index(time - t_start, segment_index=segment_index)
         else:
-            segment = self.segments[segment_index]
-            t_start = segment._t_start if segment._t_start is not None else 0
             sample_index = round((time - t_start) * self.get_sampling_frequency())
 
         return sample_index
@@ -717,11 +790,11 @@ class BaseSorting(BaseExtractor):
         Transform sample index into time in seconds
         """
         segment_index = self._check_segment_index(segment_index)
+        segment = self.segments[segment_index]
+        t_start = segment._t_start if segment._t_start is not None else 0
         if self.has_recording():
-            return self._recording.sample_index_to_time(sample_index, segment_index=segment_index)
+            return self._recording.sample_index_to_time(sample_index, segment_index=segment_index) + t_start
         else:
-            segment = self.segments[segment_index]
-            t_start = segment._t_start if segment._t_start is not None else 0
             return (sample_index / self.get_sampling_frequency()) + t_start
 
     def precompute_spike_trains(self):
